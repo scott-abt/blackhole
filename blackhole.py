@@ -13,6 +13,8 @@ for line in html.split("\n"):
     if not re.match('^;', line):
         splitLine = line.split()
         if splitLine:
+            # check that its a valid IP or cidr mask.
+
             # Change this to insert the IP to a database
             print('set policy-options prefix-list blackhole ' + splitLine[0])
 
