@@ -30,18 +30,17 @@ for line in split_html:
         continue
     splitLine = line.split()
     if splitLine and ipcalc.Network(splitLine[0]):
-        insert_string = "INSERT INTO ip_addrs_found VALUES\
-                        ('{}', '{}', '{}', '1')".format(splitLine[0], now, now)
+        insert_string = "INSERT INTO ip_addrs_found VALUES (?, ?, ?, ?)"
         try:
-            c.execute(insert_string)
+            c.execute(insert_string, (splitLine[0], now, now, 1))
             inserted += 1
         except IntegrityError as e:
             try:
-                c.execute("UPDATE ip_addrs_found set last_seen = '{}' \
-                           WHERE ip = '{}'".format(now, splitLine[0]))
+                c.execute("UPDATE ip_addrs_found set last_seen = ? \
+                           WHERE ip = ?", (now, splitLine[0]))
                 updated += 1
             except:
                 raise
 if c.rowcount and (updated > 0 or inserted > 0):
-    print("Updating: {0}\Inserting: {1}".format(updated, inserted))
+    print("Updating: {0}\nInserting: {1}".format(updated, inserted))
     ip_db.commit()
