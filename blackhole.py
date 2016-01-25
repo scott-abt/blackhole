@@ -1,24 +1,47 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
-import urllib2
+from datetime import datetime as DT
+from urllib import request
 import re
+import ipcalc
+import sqlite3
+from sqlite3 import IntegrityError
 
-req = urllib2.Request(
-        'http://www.spamhaus.org/drop/drop.txt', headers={ 'User-Agent': 
-        'Mozilla/5.0' })
+now = str(DT.now())
 
-html = urllib2.urlopen(req).read()
+req = request.Request(
+        'http://www.spamhaus.org/drop/drop.txt',
+        headers={ 'User-Agent': 'Mozilla/5.0' } )
 
-for line in html.split("\n"):
-    if not re.match('^;', line):
-        splitLine = line.split()
-        if splitLine:
-            # check that its a valid IP or cidr mask.
+html = request.urlopen(req)
+html_response = html.read().decode('utf-8')
+split_html = html_response.split("\n")
 
-            # Change this to insert the IP to a database
-            print('set policy-options prefix-list blackhole ' + splitLine[0])
+ip_db = sqlite3.connect('ip_addrs.db')
+c = ip_db.cursor()
 
-            # Check to see if the IP is already in the list
-            # Remove IP's that have aged out
-            # Add new IP's
-            # Update routing
+current_table = c.execute("SELECT ip FROM ip_addrs_found WHERE valid = '1'")
+
+inserted = 0
+updated = 0
+
+for line in split_html:
+    if re.match('^;', line):
+        continue
+    splitLine = line.split()
+    if splitLine and ipcalc.Network(splitLine[0]):
+        insert_string = "INSERT INTO ip_addrs_found VALUES\
+                        ('{}', '{}', '{}', '1')".format(splitLine[0], now, now)
+        try:
+            c.execute(insert_string)
+            inserted += 1
+        except IntegrityError as e:
+            try:
+                c.execute("UPDATE ip_addrs_found set last_seen = '{}' \
+                           WHERE ip = '{}'".format(now, splitLine[0]))
+                updated += 1
+            except:
+                raise
+if c.rowcount and (updated > 0 or inserted > 0):
+    print("Updating: {0}\Inserting: {1}".format(updated, inserted))
+    ip_db.commit()
